@@ -1,0 +1,84 @@
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/adc.h"
+#include "driverlib/timer.h"
+
+#ifdef DEBUG
+void
+__error__(char *pcFilename, uint32_t ui32Line)
+{
+}
+#endif
+
+uint32_t valor[8];
+
+void call_adc (){
+
+
+
+
+}
+
+int
+main(void)
+{
+    uint32_t ui32SysClock;
+
+    //
+    // Run from the PLL at 120 MHz.
+    //
+    ui32SysClock = SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
+                                       SYSCTL_OSC_MAIN |
+                                       SYSCTL_USE_PLL |
+                                       SYSCTL_CFG_VCO_480), 120000000);
+
+    //
+    // Enable and wait for the port to be ready for access
+    //
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
+    {
+    }
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0))
+    {
+    }
+
+    TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
+
+    //GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, (USER_LED1|USER_LED2));
+    GPIOPinTypeADC(GPIO_PORTE_AHB_BASE, GPIO_PIN_3);
+    ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_SRC_PLL, 24);
+
+    //o trigeer vai dizer qual a condiçao para inicio de conversao
+    //
+    ADCSequenceConfigure(ADC0_BASE,    0,   ADC_TRIGGER_TIMER, 0);
+
+    ADCSequenceStepConfigure(ADC0_BASE,  0,  0, ADC_CTL_IE|ADC_CTL_END|ADC_CTL_CH0);
+    ADCSequenceEnable(ADC0_BASE, 0);
+
+    //ADCSequenceDataGet(ADC0_BASE , 0, &valor);
+
+    //timer config
+    TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
+    TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
+    TimerControlTrigger(TIMER0_BASE ,    TIMER_A,    1);
+
+
+    //CONFIGURE INTERRUPT
+    ADCIntRegister(ADC0_BASE,0, &call_adc);
+    ADCIntEnable(ADC0_BASE, 0);
+    //
+    // Loop Forever
+    //
+
+    while(1)
+    {
+
+    }
+}

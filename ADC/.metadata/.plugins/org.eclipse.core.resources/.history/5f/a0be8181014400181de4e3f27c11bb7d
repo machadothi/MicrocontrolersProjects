@@ -1,0 +1,112 @@
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/adc.h"
+#include "driverlib/timer.h"
+#include "driverlib/pin_map.h"
+
+#ifdef DEBUG
+void
+__error__(char *pcFilename, uint32_t ui32Line)
+{
+}
+#endif
+
+uint32_t valor[8];
+int freq=10000;
+float duty_c = 0.5;
+
+void call_adc (){
+
+
+    if(ADCIntStatus(ADC0_BASE,true)&0x01){
+
+            ADCSequenceDataGet(ADC0_BASE, 0, &valor);
+
+            ADCIntClear(GPIO_PORTJ_BASE,0x03);
+        }
+
+}
+
+int
+main(void)
+{
+    uint32_t ui32SysClock;
+
+    //
+    // Run from the PLL at 120 MHz.
+    //
+    ui32SysClock = SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
+                                       SYSCTL_OSC_MAIN |
+                                       SYSCTL_USE_PLL |
+                                       SYSCTL_CFG_VCO_480), 120000000);
+
+    //
+    // Enable and wait for the port to be ready for access
+    //
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
+    {
+    }
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0))
+    {
+    }
+
+    TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);
+
+    //GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, (USER_LED1|USER_LED2));
+    GPIOPinTypeADC(GPIO_PORTE_AHB_BASE, GPIO_PIN_3);
+    ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_SRC_PLL, 24);
+
+    //o trigeer vai dizer qual a condiçao para inicio de conversao
+    //
+    ADCSequenceConfigure(ADC0_BASE,    0,   ADC_TRIGGER_TIMER, 0);
+
+    ADCSequenceStepConfigure(ADC0_BASE,  0,  0, ADC_CTL_IE|ADC_CTL_END|ADC_CTL_CH0);
+    ADCSequenceEnable(ADC0_BASE, 0);
+
+    //CONFIGURE GPIO PWM functions
+    GPIOPinConfigure(GPIO_PD0_T0CCP0);
+    GPIOPinTypePWM(GPIO_PORTD_BASE, GPIO_PIN_0);
+
+    GPIOPinConfigure(GPIO_PD1_T0CCP1);
+    GPIOPinTypePWM(GPIO_PORTD_BASE, GPIO_PIN_1);
+
+    //Timer Configure
+    TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM); //INICIA O TIMER SOURCE
+
+    TimerConfigure(TIMER0_BASE,(TIMER_CFG_A_PWM | TIMER_CFG_B_PWM | TIMER_CFG_SPLIT_PAIR));
+
+    //TIMER_A and TIMER_B
+    TimerLoadSet(TIMER0_BASE, TIMER_BOTH, ui32SysClock/freq);
+
+
+    //defining duty cycle for PWM
+    TimerMatchSet(TIMER0_BASE, TIMER_A, duty_c*(ui32SysClock/freq)); //25% of 10k
+    TimerMatchSet(TIMER0_BASE, TIMER_B, duty_c*(ui32SysClock/freq)); //75% of 10k
+
+    //Timers enable
+    TimerEnable(TIMER0_BASE, TIMER_BOTH);
+
+    //sync timers
+    TimerSynchronize(TIMER0_BASE, TIMER_0A_SYNC|TIMER_0B_SYNC);
+    TimerControlTrigger(ADC0_BASE, TIMER_A, 1);
+
+
+    //CONFIGURE INTERRUPT
+    ADCIntRegister(ADC0_BASE,0, &call_adc);
+    ADCIntEnable(ADC0_BASE, 0);
+    //
+    // Loop Forever
+    //
+
+    while(1)
+    {
+
+    }
+}
